@@ -1,0 +1,15 @@
+﻿[dotenv@17.3.1] injecting env (3) from .env -- tip: ΓÜÖ∩╕Å  suppress all logs with { quiet: true }
+Server is running on port 5000
+MongoDB connection error: MongoParseError: options usenewurlparser, useunifiedtopology are not supported
+    at parseOptions (K:\A my all files\6th senm porject\crop\backend\node_modules\mongodb\lib\connection_string.js:272:15)
+    at new MongoClient (K:\A my all files\6th senm porject\crop\backend\node_modules\mongodb\lib\mongo_client.js:67:61)
+    at NativeConnection.createClient (K:\A my all files\6th senm porject\crop\backend\node_modules\mongoose\lib\drivers\node-mongodb-native\connection.js:334:14)
+    at NativeConnection.openUri (K:\A my all files\6th senm porject\crop\backend\node_modules\mongoose\lib\connection.js:1075:34)
+    at Mongoose.connect (K:\A my all files\6th senm porject\crop\backend\node_modules\mongoose\lib\mongoose.js:471:15)
+    at Object.<anonymous> (K:\A my all files\6th senm porject\crop\backend\server.js:23:10)
+    at Module._compile (node:internal/modules/cjs/loader:1803:14)
+    at Object..js (node:internal/modules/cjs/loader:1934:10)
+    at Module.load (node:internal/modules/cjs/loader:1524:32)
+    at Module._load (node:internal/modules/cjs/loader:1326:12) {
+  errorLabelSet: Set(0) {}
+}
