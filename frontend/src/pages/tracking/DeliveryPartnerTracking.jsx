@@ -11,13 +11,6 @@ function DeliveryPartnerTracking() {
   const [order, setOrder] = useState(null);
   const [liveLocation, setLiveLocation] = useState({ lat: 12.9716, lng: 77.5946 });
 
-  useEffect(() => {
-    fetchOrderDetails();
-    // Simulate live movement or updating system location
-    const int = setInterval(updateLiveLocationBackend, 15000); // 15 seconds
-    return () => clearInterval(int);
-  }, []);
-
   const fetchOrderDetails = async () => {
     try {
       const res = await axios.get('/api/delivery/my-deliveries', {
@@ -46,6 +39,13 @@ function DeliveryPartnerTracking() {
       console.error("Failed to update live location", err);
     }
   };
+
+  useEffect(() => {
+    fetchOrderDetails();
+    // Simulate live movement or updating system location
+    const int = setInterval(updateLiveLocationBackend, 15000); // 15 seconds
+    return () => clearInterval(int);
+  }, []);
 
   if (!order) return <div>Loading...</div>;
 

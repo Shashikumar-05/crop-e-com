@@ -6,32 +6,33 @@ import toast from 'react-hot-toast';
 
 function Profile() {
   const { logout } = useAuth();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const stored = localStorage.getItem('user');
+    return stored ? JSON.parse(stored) : null;
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const [editForm, setEditForm] = useState({
-    name: '',
-    phone: '',
-    location: ''
+  const [editForm, setEditForm] = useState(() => {
+    const stored = localStorage.getItem('user');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return {
+        name: parsed.name || '',
+        phone: parsed.phone || '',
+        location: parsed.location || ''
+      };
+    }
+    return { name: '', phone: '', location: '' };
   });
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
+    if (!user) {
       navigate('/login');
-      return;
     }
-    const parsedUser = JSON.parse(storedUser);
-    setUser(parsedUser);
-    setEditForm({
-      name: parsedUser.name || '',
-      phone: parsedUser.phone || '',
-      location: parsedUser.location || ''
-    });
     setLoading(false);
-  }, [navigate]);
+  }, [navigate, user]);
 
   const onLogout = () => {
     logout();
