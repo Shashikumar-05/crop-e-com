@@ -11,7 +11,7 @@ const getSellerOrders = async (req, res) => {
     const orders = await Order.find({ 'items.farmer': req.user._id })
       .populate('buyer', 'name email phone location')
       .populate('deliveryPartner', 'name phone')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: 1 });
     res.json(orders);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -26,7 +26,7 @@ const getAllOrders = async (req, res) => {
       .populate('buyer', 'name email phone location')
       .populate('items.farmer', 'name phone location')
       .populate('deliveryPartner', 'name phone')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: 1 });
     res.json(orders);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

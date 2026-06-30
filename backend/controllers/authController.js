@@ -43,10 +43,22 @@ const registerUser = async (req, res) => {
     if (user) {
       // If delivery partner, create vehicle
       if (role === 'Delivery') {
+        const vehicleType = vehicle || 'Bike';
+        let cap = capacity_kg || 50;
+        let rate = 15;
+
+        // Apply new strict rates
+        if (vehicleType === '3 Wheeler') { cap = 500; rate = 50; }
+        else if (vehicleType === 'Mini Van') { cap = 1000; rate = 150; }
+        else if (vehicleType === '4 Wheeler Pickup') { cap = 1500; rate = 230; }
+        else if (vehicleType === '4-Wheeler Pickup (Large)') { cap = 3000; rate = 500; }
+        else if (vehicleType === '6-Wheeler Truck') { cap = 8000; rate = 700; }
+
         const newVehicle = await Vehicle.create({
-          vehicle_type: vehicle || 'Bike',
+          vehicle_type: vehicleType,
           vehicle_number: vehicle_number || `PENDING-${Date.now()}`,
-          capacity_kg: capacity_kg || 50,
+          capacity_kg: cap,
+          price_per_km: rate,
           assigned_driver: user._id,
           license_number: license_number || '',
           license_image: license_image || '',

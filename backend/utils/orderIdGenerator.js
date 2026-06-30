@@ -5,8 +5,8 @@ const generateOrderId = async () => {
   const currentMonth = currentDate.getMonth() + 1; // 1-12
   const currentYear = currentDate.getFullYear();
   
-  // Unique counter ID for each month-year combination
-  const counterId = `order_${currentYear}_${currentMonth}`;
+  // Unique counter ID for all orders
+  const counterId = 'global_orders';
 
   // Atomically increment the sequence, or create it if it doesn't exist
   const counter = await Counter.findByIdAndUpdate(
@@ -17,9 +17,8 @@ const generateOrderId = async () => {
 
   const sequenceNumber = counter.seq;
   
-  // Format with at least 4 digits
-  const paddedSequence = sequenceNumber.toString().padStart(4, '0');
-  const orderId = `#K${paddedSequence}`;
+  // Format as simple string
+  const orderId = sequenceNumber.toString();
 
   return {
     order_id: orderId,

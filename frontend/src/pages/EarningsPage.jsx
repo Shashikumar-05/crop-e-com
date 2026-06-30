@@ -113,6 +113,11 @@ const EarningsPage = () => {
   };
 
   const applyFilters = () => {
+    if (reportType === 'All Orders') {
+      setFilteredHistory(history);
+      return;
+    }
+
     const start = new Date(fromDate);
     start.setHours(0, 0, 0, 0);
     const end = new Date(toDate);
@@ -195,6 +200,7 @@ const EarningsPage = () => {
               <option value="Weekly Report">Weekly Report</option>
               <option value="Monthly Report">Monthly Report</option>
               <option value="Yearly Report">Yearly Report</option>
+              <option value="All Orders">All Orders</option>
               <option value="Custom">Custom Date</option>
             </select>
           </div>

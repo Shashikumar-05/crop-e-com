@@ -10,7 +10,7 @@ const getMyDeliveries = async (req, res) => {
       .populate('buyer', 'name phone location')
       .populate('items.farmer', 'name phone location')
       .populate('vehicle', 'vehicle_type vehicle_number')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: 1 });
     res.json(orders);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -28,7 +28,7 @@ const getAvailableOrders = async (req, res) => {
       .populate('buyer', 'name phone location')
       .populate('items.farmer', 'name phone location')
       .populate('vehicle', 'vehicle_type vehicle_number')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: 1 });
     res.json(orders);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -51,6 +51,7 @@ const updateDeliveryStatus = async (req, res) => {
     order.orderStatus = status;
     if (status === 'Delivered') {
       order.deliveredAt = new Date();
+      order.completedAt = new Date();
       // Update payment details
       if (paymentMethod) order.paymentMethod = paymentMethod;
       if (paymentScreenshot) order.paymentScreenshot = paymentScreenshot;
@@ -70,15 +71,19 @@ const updateDeliveryStatus = async (req, res) => {
       const Transaction = require('../models/Transaction');
 
       // 1. Credit Delivery Partner Wallet
-      if (order.deliveryTotal) {
-        await User.findByIdAndUpdate(req.user._id, { $inc: { walletBalance: order.deliveryTotal } });
+      if (order.deliveryCharge || order.deliveryTotal) {
+        const dAmt = order.deliveryCharge || order.deliveryTotal;
+        await User.findByIdAndUpdate(req.user._id, { $inc: { walletBalance: dAmt } });
+        order.deliveryPartnerAmount = dAmt;
       }
 
       // 2. Credit Seller Wallet
       if (order.items && order.items.length > 0) {
         const farmerId = order.items[0].farmer;
-        if (farmerId && order.productTotal) {
-          await User.findByIdAndUpdate(farmerId, { $inc: { walletBalance: order.productTotal } });
+        const pTotal = order.productTotal || (order.totalAmount - (order.deliveryCharge || order.deliveryTotal || 0)) || 0;
+        if (farmerId && pTotal > 0) {
+          await User.findByIdAndUpdate(farmerId, { $inc: { walletBalance: pTotal } });
+          order.sellerAmount = pTotal;
         }
       }
 
@@ -91,7 +96,7 @@ const updateDeliveryStatus = async (req, res) => {
       await Transaction.create({
         order_id: order._id,
         seller_amount: order.productTotal || 0,
-        delivery_amount: order.deliveryTotal || 0,
+        delivery_amount: order.deliveryCharge || order.deliveryTotal || 0,
         platform_fee: order.platformFee || 0,
         payment_type: paymentMethod || order.paymentMethod || 'COD',
         status: 'Completed'

@@ -48,10 +48,54 @@ const getVehicles = async (req, res) => {
   }
 };
 
+const updateVehiclePrice = async (req, res) => {
+  try {
+    if (req.user.role !== 'Manager') return res.status(403).json({ message: 'Not authorized' });
+    const { price_per_km } = req.body;
+    
+    if (!price_per_km || isNaN(price_per_km)) {
+      return res.status(400).json({ message: 'Valid price per km is required' });
+    }
+
+    const vehicle = await Vehicle.findByIdAndUpdate(
+      req.params.id, 
+      { price_per_km: Number(price_per_km) },
+      { new: true }
+    );
+
+    if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
+    
+    res.json({ message: 'Vehicle price updated successfully', vehicle });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+const updateVehiclePriceByType = async (req, res) => {
+  try {
+    if (req.user.role !== 'Manager') return res.status(403).json({ message: 'Not authorized' });
+    const { price_per_km } = req.body;
+    const { type } = req.params;
+    
+    if (!price_per_km || isNaN(price_per_km)) {
+      return res.status(400).json({ message: 'Valid price per km is required' });
+    }
+
+    const updated = await Vehicle.updateMany(
+      { vehicle_type: type },
+      { price_per_km: Number(price_per_km) }
+    );
+
+    res.json({ message: 'Vehicle prices updated successfully', updatedCount: updated.modifiedCount });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 const assignDeliveryPartner = async (req, res) => {
   try {
     if (req.user.role !== 'Manager') return res.status(403).json({ message: 'Not authorized' });
-    const { deliveryPartnerId, vehicleId, distance } = req.body;
+    const { deliveryPartnerId, vehicleId, deliveryCharge, distance } = req.body;
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
@@ -60,10 +104,19 @@ const assignDeliveryPartner = async (req, res) => {
       return res.status(400).json({ message: 'Invalid delivery partner' });
     }
 
-    if (distance) {
-      order.deliveryDistance = Number(distance);
-      order.deliveryRate = 20;
-      order.deliveryTotal = Number(distance) * 20;
+    // If deliveryCharge is manually provided and no vehicle is selected (fallback)
+    if (deliveryCharge !== undefined && !vehicleId) {
+      const baseProductTotal = order.productTotal || order.totalAmount || 0;
+      order.productTotal = baseProductTotal;
+      order.deliveryCharge = Number(deliveryCharge);
+      order.deliveryTotal = Number(deliveryCharge); // fallback mapping
+      
+      if (distance !== undefined) {
+        order.deliveryDistance = Number(distance);
+      }
+      
+      order.grandTotal = baseProductTotal + Number(deliveryCharge);
+      order.totalAmount = order.grandTotal;
     }
 
     if (vehicleId) {
@@ -73,6 +126,18 @@ const assignDeliveryPartner = async (req, res) => {
       vehicle.assigned_driver = deliveryPartnerId;
       await vehicle.save();
       order.vehicle = vehicleId;
+
+      // Automatically calculate delivery charges based on vehicle price
+      const dist = distance !== undefined ? Number(distance) : (order.deliveryDistance || 20); // "given km is 20km"
+      const calcDeliveryCharge = (vehicle.price_per_km || 150) * dist;
+
+      const baseProductTotal = order.productTotal || order.totalAmount || 0;
+      order.productTotal = baseProductTotal;
+      order.deliveryCharge = calcDeliveryCharge;
+      order.deliveryTotal = calcDeliveryCharge; 
+      order.deliveryDistance = dist;
+      order.grandTotal = baseProductTotal + calcDeliveryCharge;
+      order.totalAmount = order.grandTotal;
     }
 
     order.deliveryPartner = deliveryPartnerId;
@@ -456,6 +521,40 @@ const managerCancelOrder = async (req, res) => {
   }
 };
 
+const payFarmer = async (req, res) => {
+  try {
+    if (req.user.role !== 'Manager') return res.status(403).json({ message: 'Not authorized' });
+    const { farmerId } = req.params;
+    
+    // Find all delivered orders for this farmer where farmerPaid is false
+    const result = await Order.updateMany(
+      { 'items.farmer': farmerId, orderStatus: 'Delivered', farmerPaid: { $ne: true } },
+      { $set: { farmerPaid: true } }
+    );
+    
+    res.json({ message: 'Farmer marked as paid for all pending completed orders.', updatedCount: result.modifiedCount });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+const payDeliveryPartner = async (req, res) => {
+  try {
+    if (req.user.role !== 'Manager') return res.status(403).json({ message: 'Not authorized' });
+    const { partnerId } = req.params;
+    
+    // Find all delivered orders for this delivery partner where deliveryPartnerPaid is false
+    const result = await Order.updateMany(
+      { deliveryPartner: partnerId, orderStatus: 'Delivered', deliveryPartnerPaid: { $ne: true } },
+      { $set: { deliveryPartnerPaid: true } }
+    );
+    
+    res.json({ message: 'Delivery Partner marked as paid for all pending completed orders.', updatedCount: result.modifiedCount });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   getManagerOrders,
   getDeliveryPartners,
@@ -470,5 +569,8 @@ module.exports = {
   confirmBill,
   approveCancellation,
   quickAction,
-  managerCancelOrder
+  managerCancelOrder,
+  payFarmer,
+  payDeliveryPartner,
+  updateVehiclePriceByType
 };

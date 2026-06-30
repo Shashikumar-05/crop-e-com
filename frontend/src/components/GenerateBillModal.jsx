@@ -44,17 +44,22 @@ function GenerateBillModal({ order, onClose, onConfirm, userToken }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedVehicle || !selectedPartner || !distance) {
+    if (!selectedVehicle || !selectedPartner || distance === '') {
       toast.error('Please select vehicle, partner, and enter distance.');
       return;
     }
     setIsSubmitting(true);
     try {
       const config = { headers: { Authorization: `Bearer ${userToken}` } };
+      const selectedVehicleData = vehicles.find(v => v._id === selectedVehicle);
+      const ratePerKm = selectedVehicleData ? selectedVehicleData.price_per_km : 150;
+      const calculatedDeliveryCharge = Number(distance) * ratePerKm;
+
       const payload = {
         vehicleId: selectedVehicle,
         deliveryPartnerId: selectedPartner,
-        distance: Number(distance)
+        distance: Number(distance),
+        deliveryCharge: calculatedDeliveryCharge
       };
       await axios.put(`/api/manager/assign-order/${order._id}`, payload, config);
       toast.success('Vehicle and Partner assigned successfully!');
@@ -142,20 +147,32 @@ function GenerateBillModal({ order, onClose, onConfirm, userToken }) {
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1 flex items-center gap-1">
-                    <span>📍</span> Distance (in Km)
+                    <span>📍</span> Distance {selectedVehicle ? `(₹${vehicles.find(v => v._id === selectedVehicle)?.price_per_km || 150}/KM)` : '(in KM)'}
                   </label>
                   <input 
                     type="number"
-                    min="1"
-                    placeholder="e.g. 50"
+                    min="0"
+                    placeholder="e.g. 40"
                     value={distance}
                     onChange={(e) => setDistance(e.target.value)}
                     className="w-full border rounded-lg px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm transition-all"
                     required
                   />
-                  {distance && (
-                    <div className="mt-2 text-xs font-bold text-indigo-600 bg-indigo-50 p-2 rounded border border-indigo-100">
-                      Calculated Delivery Charge: ₹{Number(distance) * 20} (₹20/km)
+                  
+                  {distance !== '' && selectedVehicle && (
+                    <div className="mt-3 text-xs font-bold text-indigo-700 bg-indigo-50 p-3 rounded-lg border border-indigo-100 flex flex-col gap-1">
+                      <div className="flex justify-between items-center text-indigo-600">
+                        <span>Product Price:</span>
+                        <span>₹{order.productTotal || order.totalAmount || 0}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-indigo-600">
+                        <span>Calculated Delivery Charge:</span>
+                        <span>₹{Number(distance) * (vehicles.find(v => v._id === selectedVehicle)?.price_per_km || 150)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-indigo-900 border-t border-indigo-200 pt-1 mt-1 font-black">
+                        <span>Grand Total:</span>
+                        <span>₹{(order.productTotal || order.totalAmount || 0) + Number(distance) * (vehicles.find(v => v._id === selectedVehicle)?.price_per_km || 150)}</span>
+                      </div>
                     </div>
                   )}
                 </div>

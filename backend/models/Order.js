@@ -56,7 +56,13 @@ const orderSchema = new mongoose.Schema({
   deliveryDistance: { type: Number, default: 0 },
   deliveryRate: { type: Number, default: 0 },
   deliveryTotal: { type: Number, default: 0 },
+  deliveryCharge: { type: Number, default: 0 },
   grandTotal: { type: Number, default: 0 },
+  sellerAmount: { type: Number, default: 0 },
+  deliveryPartnerAmount: { type: Number, default: 0 },
+  farmerPaid: { type: Boolean, default: false },
+  deliveryPartnerPaid: { type: Boolean, default: false },
+  completedAt: { type: Date },
 
   // Delivery and Manager partner assignment
   manager: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },

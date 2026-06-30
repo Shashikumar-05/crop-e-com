@@ -9,12 +9,12 @@ import GenerateBillModal from '../components/GenerateBillModal';
 function ManagerDashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  
+
   const [orders, setOrders] = useState([]);
   const [partners, setPartners] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Tabs for layout
   const [orderTab, setOrderTab] = useState('All');
   const [partnerTab, setPartnerTab] = useState('Available');
@@ -117,14 +117,14 @@ function ManagerDashboard() {
   // Derived logic for partner status based on orders they are handling
   const getPartnerStatus = (partnerId) => {
     const partnerOrders = orders.filter(o => o.deliveryPartner?._id === partnerId);
-    
+
     const assignedOrder = partnerOrders.find(o => ['Assigned to Delivery Partner'].includes(o.orderStatus));
     const onTripOrder = partnerOrders.find(o => ['Picked Up', 'Out for Delivery'].includes(o.orderStatus));
     // Since we don't have a strict 'Returning' state in backend, we simplify it matching standard flows
-    
+
     if (onTripOrder) return 'On Trip';
     if (assignedOrder) return 'Assigned';
-    
+
     const partner = partners.find(p => p._id === partnerId);
     if (partner?.availability_status === false) return 'Offline';
     return 'Available';
@@ -133,7 +133,7 @@ function ManagerDashboard() {
   // Filter orders based on Tabs
   const unassignedStatuses = ['Accepted', 'Pending', 'Waiting for Manager Review', 'Bill Confirmed'];
   const ongoingStatuses = ['Assigned to Delivery Partner', 'Picked Up', 'Out for Delivery'];
-  
+
   const filteredOrders = orders.filter(o => {
     if (orderTab === 'All') return o.orderStatus !== 'Inquiry';
     if (orderTab === 'Enquiries') return o.orderStatus === 'Inquiry';
@@ -166,16 +166,16 @@ function ManagerDashboard() {
 
   // Smart matching: finding if the partner is in the same area as the currently selected order
   const selectedOrderObj = orders.find(o => o._id === selectedOrderId);
-  const orderAreaString = selectedOrderObj 
-      ? (selectedOrderObj.deliveryAddress + ' ' + (selectedOrderObj.items?.[0]?.farmer?.area || '')).toLowerCase() 
-      : '';
+  const orderAreaString = selectedOrderObj
+    ? (selectedOrderObj.deliveryAddress + ' ' + (selectedOrderObj.items?.[0]?.farmer?.area || '')).toLowerCase()
+    : '';
   const orderTotalQty = selectedOrderObj?.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
 
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <div className="text-xl font-semibold text-gray-500 flex items-center gap-2">
-           <svg className="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
@@ -194,7 +194,7 @@ function ManagerDashboard() {
           <p className="text-gray-500 text-sm m-0 mt-1">Smart split-screen layout for rapid delivery assignments</p>
         </div>
         <Link to="/manager/tracking" className="mt-4 md:mt-0 px-5 py-2.5 bg-blue-50 text-blue-700 font-semibold rounded-lg hover:bg-blue-100 transition shadow-sm border border-blue-100 flex items-center gap-2">
-           <span>🗺️</span> Monitor Live Fleet
+          <span>🗺️</span> Monitor Live Fleet
         </Link>
       </div>
 
@@ -204,7 +204,7 @@ function ManagerDashboard() {
       <div className="flex flex-col md:flex-row gap-4 md:gap-6 h-full">
         {/* ICON SIDEBAR */}
         <div className="w-full md:w-16 bg-white rounded-2xl shadow-sm border border-gray-200 flex md:flex-col items-center justify-around md:justify-start py-3 md:py-6 gap-2 md:gap-6 h-auto md:h-[75vh] flex-shrink-0">
-          <button 
+          <button
             onClick={() => setActiveView('orders')}
             title="Orders Queue"
             className={`text-2xl p-3 rounded-xl transition relative ${activeView === 'orders' ? 'bg-indigo-100 shadow-inner' : 'hover:bg-gray-50'}`}
@@ -212,21 +212,21 @@ function ManagerDashboard() {
             📦
             {orderCounts.Unassigned > 0 && <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>}
           </button>
-          <button 
+          <button
             onClick={() => setActiveView('vehicles')}
             title="Vehicle Categories"
             className={`text-2xl p-3 rounded-xl transition ${activeView === 'vehicles' ? 'bg-indigo-100 shadow-inner' : 'hover:bg-gray-50'}`}
           >
             🚛
           </button>
-          <button 
+          <button
             onClick={() => setActiveView('fleet')}
             title="Delivery Fleet"
             className={`text-2xl p-3 rounded-xl transition ${activeView === 'fleet' ? 'bg-indigo-100 shadow-inner' : 'hover:bg-gray-50'}`}
           >
             🏃
           </button>
-          <button 
+          <button
             onClick={() => setActiveView('contacts')}
             title="Recent Contacts"
             className={`text-2xl p-3 rounded-xl transition relative ${activeView === 'contacts' ? 'bg-indigo-100 shadow-inner' : 'hover:bg-gray-50'}`}
@@ -237,18 +237,18 @@ function ManagerDashboard() {
 
         {/* FULL SCREEN DYNAMIC CONTENT */}
         <div className="flex-1 min-w-0">
-          
+
           {/* ================= VIEW: ORDERS ================= */}
           {activeView === 'orders' && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[75vh]">
               {/* Panel Header */}
               <div className="p-5 border-b border-gray-100 bg-gray-50/50">
                 <h2 className="text-lg font-bold text-gray-800 m-0 flex items-center gap-2">
-                   📦 Orders Queue
-                   {orderCounts.Unassigned > 0 && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">{orderCounts.Unassigned} unassigned</span>}
+                  📦 Orders Queue
+                  {orderCounts.Unassigned > 0 && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">{orderCounts.Unassigned} unassigned</span>}
                 </h2>
               </div>
-              
+
               {/* Tabs */}
               <div className="px-5 pt-4 border-b border-gray-100 flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
                 {['All', 'Enquiries', 'Unassigned', 'Ongoing', 'Completed', 'Cancellations'].map(tab => (
@@ -258,7 +258,7 @@ function ManagerDashboard() {
                     className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2
                       ${orderTab === tab ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                   >
-                    {tab} 
+                    {tab}
                     <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${orderTab === tab ? 'bg-white text-indigo-600' : 'bg-gray-200 text-gray-500'}`}>
                       {orderCounts[tab]}
                     </span>
@@ -290,7 +290,7 @@ function ManagerDashboard() {
                       <tbody>
                         {filteredOrders.map(order => {
                           const isSelected = selectedOrderId === order._id;
-                          
+
                           let badgeClass = 'bg-gray-100 text-gray-600';
                           if (['Pending', 'Waiting for Manager Review'].includes(order.orderStatus)) badgeClass = 'bg-yellow-100 text-yellow-700';
                           else if (['Assigned to Delivery Partner', 'Picked Up', 'Out for Delivery'].includes(order.orderStatus)) badgeClass = 'bg-blue-500 text-white shadow-md';
@@ -298,7 +298,7 @@ function ManagerDashboard() {
                           else if (order.orderStatus === 'Cancelled') badgeClass = 'bg-red-100 text-red-700';
 
                           return (
-                            <tr 
+                            <tr
                               key={order._id}
                               onClick={() => {
                                 setSelectedOrderId(order._id);
@@ -344,12 +344,12 @@ function ManagerDashboard() {
                               <td className="px-4 py-4 whitespace-nowrap">
                                 {order.deliveryPartner ? (
                                   <div className="flex items-center gap-2">
-                                     <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">
-                                        {order.deliveryPartner.name?.charAt(0) || 'P'}
-                                     </div>
-                                     <div>
-                                        <div className="font-semibold text-gray-800 text-[10px]">{order.deliveryPartner.name}</div>
-                                     </div>
+                                    <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">
+                                      {order.deliveryPartner.name?.charAt(0) || 'P'}
+                                    </div>
+                                    <div>
+                                      <div className="font-semibold text-gray-800 text-[10px]">{order.deliveryPartner.name}</div>
+                                    </div>
                                   </div>
                                 ) : (
                                   <span className="text-gray-400 text-xs">-</span>
@@ -389,7 +389,7 @@ function ManagerDashboard() {
                                       </a>
                                     </>
                                   )}
-                                  <button 
+                                  <button
                                     onClick={(e) => { e.stopPropagation(); setHistoryModalOrder(order); }}
                                     className="text-gray-500 hover:text-gray-800 ml-1 text-lg font-bold px-2 py-0.5 rounded hover:bg-gray-100 transition"
                                     title="View Order Details & Actions"
@@ -414,14 +414,14 @@ function ManagerDashboard() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[75vh]">
               <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
                 <h2 className="text-lg font-bold text-gray-800 m-0">
-                  🚛 {selectedVehicleCategory ? 'Select Vehicle' : 'Vehicle Categories'} 
+                  🚛 {selectedVehicleCategory ? 'Select Vehicle' : 'Vehicle Categories'}
                   {orderTotalQty > 0 && <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full ml-2">Load: {orderTotalQty} kg</span>}
                 </h2>
               </div>
               <div className="flex-1 overflow-y-auto p-5 bg-gray-50/30">
                 {selectedVehicleCategory ? (
-                  <VehicleList 
-                    vehicles={vehicles.filter(v => v.vehicle_type === selectedVehicleCategory)} 
+                  <VehicleList
+                    vehicles={vehicles.filter(v => v.vehicle_type === selectedVehicleCategory)}
                     selectedVehicleId={selectedVehicleId}
                     onSelectVehicle={(id) => {
                       if (!selectedOrderId) {
@@ -454,9 +454,9 @@ function ManagerDashboard() {
                           const capacity = categoryVehicles[0]?.capacity_kg || 0;
                           const availableCount = categoryVehicles.filter(v => v.status === 'available').length;
                           const isRecommended = selectedOrderId && capacity >= orderTotalQty && capacity < orderTotalQty + 1000;
-                          
+
                           return (
-                            <tr 
+                            <tr
                               key={type}
                               onClick={() => availableCount > 0 ? setSelectedVehicleCategory(type) : toast.error('No available vehicles in this category')}
                               className={`border-b hover:bg-gray-50 transition ${availableCount > 0 ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'}`}
@@ -495,7 +495,7 @@ function ManagerDashboard() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[75vh]">
               <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
                 <h2 className="text-lg font-bold text-gray-800 m-0 flex items-center gap-2">
-                   🏃 Delivery Fleet
+                  🏃 Delivery Fleet
                 </h2>
               </div>
 
@@ -513,9 +513,9 @@ function ManagerDashboard() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-5 bg-gray-50/30">
-                 {filteredPartners.length === 0 ? (
+                {filteredPartners.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
-                     <p className="text-lg">No partners in '{partnerTab}' queue</p>
+                    <p className="text-lg">No partners in '{partnerTab}' queue</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto pb-4">
@@ -534,21 +534,21 @@ function ManagerDashboard() {
                           const isSameArea = selectedOrderObj && partner.area && orderAreaString.includes(partner.area.toLowerCase());
 
                           return (
-                            <tr 
+                            <tr
                               key={partner._id}
                               className="border-b hover:bg-gray-50 transition"
                             >
                               <td className="px-4 py-4 font-semibold text-gray-800 whitespace-nowrap">
                                 <div className="flex items-center gap-3">
-                                   <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center">
-                                      {partner.name ? partner.name.charAt(0) : 'P'}
-                                   </div>
-                                   <div>
-                                      <div>{partner.name}</div>
-                                      {isSameArea && selectedOrderId && status === 'Available' && (
-                                        <span className="text-[9px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold uppercase mt-1 inline-block">⭐ Match</span>
-                                      )}
-                                   </div>
+                                  <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center">
+                                    {partner.name ? partner.name.charAt(0) : 'P'}
+                                  </div>
+                                  <div>
+                                    <div>{partner.name}</div>
+                                    {isSameArea && selectedOrderId && status === 'Available' && (
+                                      <span className="text-[9px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold uppercase mt-1 inline-block">⭐ Match</span>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                               <td className="px-4 py-4 whitespace-nowrap">
@@ -558,11 +558,11 @@ function ManagerDashboard() {
                                 <div className="text-xs text-gray-700">{partner.area || 'Not Specified'}</div>
                               </td>
                               <td className="px-4 py-4 text-center whitespace-nowrap">
-                                 <span className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wide
-                                     ${status === 'Available' ? 'bg-green-100 text-green-700' : 
-                                       status === 'Assigned' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>
-                                     {status}
-                                 </span>
+                                <span className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wide
+                                     ${status === 'Available' ? 'bg-green-100 text-green-700' :
+                                    status === 'Assigned' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>
+                                  {status}
+                                </span>
                               </td>
                             </tr>
                           );
@@ -580,62 +580,62 @@ function ManagerDashboard() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[75vh]">
               <div className="p-5 border-b border-gray-100 bg-gray-50/50">
                 <h2 className="text-lg font-bold text-gray-800 m-0 flex items-center gap-2">
-                   👥 Recent Customer & Seller Details
+                  👥 Recent Customer & Seller Details
                 </h2>
               </div>
               <div className="flex-1 overflow-y-auto p-5 bg-gray-50/30 space-y-4">
                 {orders.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
-                     <p className="text-lg">No recent orders found</p>
+                    <p className="text-lg">No recent orders found</p>
                   </div>
                 ) : (
                   [...orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(order => (
                     <div key={order._id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition">
-                       <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-50">
-                         <span className="font-bold text-gray-700">Order #{order.order_id || order._id.slice(-6).toUpperCase()}</span>
-                         <span className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleString('en-IN')}</span>
-                       </div>
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                         <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                           <h4 className="text-xs font-bold text-blue-800 mb-1 flex items-center gap-1"><span>📍</span> CUSTOMER (DELIVER TO)</h4>
-                           <p className="font-semibold text-gray-800 m-0 text-sm">{order.buyer?.name || 'Guest'}</p>
-                           <p className="text-xs text-gray-600 m-0 mt-1">{order.deliveryAddress || order.buyer?.location}</p>
-                           <div className="flex items-center gap-2 mt-2">
-                             {order.buyer?.phone ? (
-                               <>
-                                 <a href={`tel:${order.buyer.phone}`} className="flex-1 flex items-center justify-center gap-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 py-1.5 rounded-lg text-xs font-bold transition">
-                                   📞 Call
-                                 </a>
-                                 <a href={`https://wa.me/${String(order.buyer.phone).replace(/\\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 bg-green-100 hover:bg-green-200 text-green-700 py-1.5 rounded-lg text-xs font-bold transition">
-                                   💬 WhatsApp
-                                 </a>
-                               </>
-                             ) : (
-                               <span className="text-xs text-gray-400 italic">No phone provided</span>
-                             )}
-                           </div>
-                         </div>
-                         <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
-                           <h4 className="text-xs font-bold text-emerald-800 mb-1 flex items-center gap-1"><span>🏪</span> SELLER (PICKUP FROM)</h4>
-                           <p className="font-semibold text-gray-800 m-0 text-sm">{order.items?.[0]?.farmer?.name || 'Unknown'}</p>
-                           <p className="text-xs text-gray-600 m-0 mt-1">{order.items?.[0]?.farmer?.location || 'N/A'}</p>
-                           <div className="flex items-center gap-2 mt-2">
-                             {order.items?.[0]?.farmer?.phone ? (
-                               <>
-                                 <a href={`tel:${order.items[0].farmer.phone}`} className="flex-1 flex items-center justify-center gap-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 py-1.5 rounded-lg text-xs font-bold transition">
-                                   📞 Call
-                                 </a>
-                                 <a href={`https://wa.me/${String(order.items[0].farmer.phone).replace(/\\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 bg-green-100 hover:bg-green-200 text-green-700 py-1.5 rounded-lg text-xs font-bold transition">
-                                   💬 WhatsApp
-                                 </a>
-                               </>
-                             ) : (
-                               <span className="text-xs text-gray-400 italic">No phone provided</span>
-                             )}
-                           </div>
-                         </div>
+                      <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-50">
+                        <span className="font-bold text-gray-700">Order #{order.order_id || order._id.slice(-6).toUpperCase()}</span>
+                        <span className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                          <h4 className="text-xs font-bold text-blue-800 mb-1 flex items-center gap-1"><span>📍</span> CUSTOMER (DELIVER TO)</h4>
+                          <p className="font-semibold text-gray-800 m-0 text-sm">{order.buyer?.name || 'Guest'}</p>
+                          <p className="text-xs text-gray-600 m-0 mt-1">{order.deliveryAddress || order.buyer?.location}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            {order.buyer?.phone ? (
+                              <>
+                                <a href={`tel:${order.buyer.phone}`} className="flex-1 flex items-center justify-center gap-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 py-1.5 rounded-lg text-xs font-bold transition">
+                                  📞 Call
+                                </a>
+                                <a href={`https://wa.me/${String(order.buyer.phone).replace(/\\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 bg-green-100 hover:bg-green-200 text-green-700 py-1.5 rounded-lg text-xs font-bold transition">
+                                  💬 WhatsApp
+                                </a>
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">No phone provided</span>
+                            )}
+                          </div>
                         </div>
-                     </div>
+                        <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                          <h4 className="text-xs font-bold text-emerald-800 mb-1 flex items-center gap-1"><span>🏪</span> SELLER (PICKUP FROM)</h4>
+                          <p className="font-semibold text-gray-800 m-0 text-sm">{order.items?.[0]?.farmer?.name || 'Unknown'}</p>
+                          <p className="text-xs text-gray-600 m-0 mt-1">{order.items?.[0]?.farmer?.location || 'N/A'}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            {order.items?.[0]?.farmer?.phone ? (
+                              <>
+                                <a href={`tel:${order.items[0].farmer.phone}`} className="flex-1 flex items-center justify-center gap-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 py-1.5 rounded-lg text-xs font-bold transition">
+                                  📞 Call
+                                </a>
+                                <a href={`https://wa.me/${String(order.items[0].farmer.phone).replace(/\\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 bg-green-100 hover:bg-green-200 text-green-700 py-1.5 rounded-lg text-xs font-bold transition">
+                                  💬 WhatsApp
+                                </a>
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">No phone provided</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   ))
                 )}
               </div>
@@ -672,13 +672,13 @@ function ManagerDashboard() {
               ></textarea>
             </div>
             <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
-              <button 
+              <button
                 onClick={() => { setIsCancelModalOpen(false); setCancelReason(''); setOrderToCancel(null); }}
                 className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 rounded-lg transition"
               >
                 Close
               </button>
-              <button 
+              <button
                 onClick={handleManagerCancel}
                 className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition shadow-sm"
               >
@@ -709,7 +709,7 @@ function ManagerDashboard() {
                 <span className="text-sm text-gray-500">Status</span>
                 <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded uppercase">{historyModalOrder.orderStatus}</span>
               </div>
-              
+
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                 <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Product Information</h4>
                 {historyModalOrder.items?.map((item, idx) => (
@@ -732,11 +732,11 @@ function ManagerDashboard() {
                 </div>
                 <div className="flex justify-between items-center mb-2 text-sm">
                   <span className="text-gray-600">Delivery Charges</span>
-                  <span className="font-semibold text-gray-800">₹{historyModalOrder.deliveryTotal || 0}</span>
+                  <span className="font-semibold text-gray-800">₹{historyModalOrder.deliveryTotal || historyModalOrder.deliveryCharge || 0}</span>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                   <span className="font-bold text-gray-800">Grand Total</span>
-                  <span className="font-bold text-indigo-700 text-lg">₹{historyModalOrder.grandTotal || historyModalOrder.totalAmount}</span>
+                  <span className="font-bold text-indigo-700 text-lg">₹{historyModalOrder.grandTotal || historyModalOrder.totalAmount || 0}</span>
                 </div>
               </div>
             </div>
@@ -782,7 +782,7 @@ function ManagerDashboard() {
                   </button>
                 </>
               )}
-              <button 
+              <button
                 onClick={() => setHistoryModalOrder(null)}
                 className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 rounded-lg transition"
               >

@@ -227,6 +227,22 @@ function OrderTracking() {
                       <span style={{ fontWeight: '600', color: 'var(--neutral-800)' }}>₹{item.subtotal?.toLocaleString('en-IN')}</span>
                     </div>
                   ))}
+                  
+                  {/* Delivery Charge */}
+                  {(order.deliveryCharge != null || order.deliveryTotal != null) && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.88rem', borderBottom: '1px solid var(--neutral-50)' }}>
+                      <span style={{ color: 'var(--neutral-700)' }}>Delivery Charge</span>
+                      <span style={{ fontWeight: '600', color: 'var(--neutral-800)' }}>₹{(order.deliveryCharge || order.deliveryTotal || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+
+                  {/* Platform Fee */}
+                  {order.platformFee != null && order.platformFee > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.88rem', borderBottom: '1px solid var(--neutral-50)' }}>
+                      <span style={{ color: 'var(--neutral-700)' }}>Platform Fee</span>
+                      <span style={{ fontWeight: '600', color: 'var(--neutral-800)' }}>₹{order.platformFee.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Manual Bill Breakdown removed */}
@@ -245,8 +261,13 @@ function OrderTracking() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ margin: 0, fontWeight: '700', fontSize: '1.15rem', color: 'var(--primary-700)' }}>
-                      ₹{order.totalAmount?.toLocaleString('en-IN')}
+                      Grand Total: ₹{order.totalAmount?.toLocaleString('en-IN')}
                     </p>
+                    {(order.deliveryCharge == null && order.deliveryTotal == null && !['Delivered', 'Cancelled', 'Cancellation Pending'].includes(order.orderStatus)) && (
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--neutral-500)' }}>
+                        + Delivery Fee (Pending)
+                      </p>
+                    )}
                     {order.orderStatus === 'Delivered' && (
                       <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--primary-600)', fontWeight: '600' }}>Final Amount Paid</p>
                     )}

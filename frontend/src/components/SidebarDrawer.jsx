@@ -45,6 +45,7 @@ function SidebarDrawer({ isOpen, onClose, user, onLogout }) {
         return [
           { name: t('sidebar.control_desk'), path: '/manager/dashboard', icon: '👔' },
           { name: t('sidebar.live_fleet_tracking'), path: '/manager/tracking', icon: '🗺️' },
+          { name: 'Vehicle Pricing', path: '/manager/vehicles', icon: '🚚' },
           { name: t('sidebar.order_history'), path: '/manager/history', icon: '📜' },
           { name: t('sidebar.sales_transactions'), path: '/manager/sales', icon: '💳' },
           { name: t('sidebar.approvals'), path: '/manager/approvals', icon: '✅' },

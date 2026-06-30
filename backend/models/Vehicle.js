@@ -4,7 +4,7 @@ const vehicleSchema = new mongoose.Schema({
   vehicle_type: { type: String, required: true },
   vehicle_number: { type: String, required: true, unique: true },
   capacity_kg: { type: Number, required: true },
-  price_per_km: { type: Number, required: true, default: 15 },
+  price_per_km: { type: Number, required: true, default: 150 },
   status: { type: String, enum: ['available', 'busy'], default: 'available' },
   assigned_driver: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   current_location: {

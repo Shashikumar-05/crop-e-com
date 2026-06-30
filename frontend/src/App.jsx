@@ -24,6 +24,7 @@ import ApprovalPage from './pages/ApprovalPage';
 import Invoice from './pages/Invoice';
 import ManagerSales from './pages/ManagerSales';
 import ManagerOrderHistory from './pages/ManagerOrderHistory';
+import ManagerVehicles from './pages/ManagerVehicles';
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import { CartProvider } from './context/CartContext';
@@ -69,6 +70,7 @@ function App() {
                 {/* Manager Routes */}
                 <Route path='/manager/dashboard' element={<ManagerDashboard />} />
                 <Route path='/manager/tracking' element={<ManagerTracking />} />
+                <Route path='/manager/vehicles' element={<ManagerVehicles />} />
                 <Route path='/manager/history' element={<ManagerOrderHistory />} />
                 <Route path='/manager/approvals' element={<ApprovalPage />} />
                 <Route path='/manager/sales' element={<ManagerSales />} />

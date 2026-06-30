@@ -98,6 +98,7 @@ const sendEnquiry = async (req, res) => {
         buyer: buyerId,
         items: group.items,
         totalAmount: group.totalAmount,
+        productTotal: group.totalAmount,
         deliveryAddress: deliveryAddress || '',
         orderStatus: 'Inquiry'
       });

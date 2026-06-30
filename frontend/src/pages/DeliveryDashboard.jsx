@@ -343,8 +343,10 @@ function DeliveryDashboard() {
                     </span>
                   </div>
                   <div className="flex justify-between items-center pt-2.5 border-t border-gray-200/60 mt-1">
-                    <span className="text-gray-900 font-extrabold text-sm">Delivery Charge (To Collect):</span>
-                    <span className="text-2xl font-black text-indigo-700">₹{(paymentModal.order?.deliveryTotal || 0).toLocaleString('en-IN')}</span>
+                    <span className="text-gray-900 font-extrabold text-sm">Amount To Collect:</span>
+                    <span className="text-2xl font-black text-indigo-700">
+                      ₹{(paymentModal.order?.grandTotal || paymentModal.order?.totalAmount || 0)?.toLocaleString('en-IN')}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -373,7 +375,7 @@ function DeliveryDashboard() {
                     <span className="text-5xl block animate-bounce mb-3">💵</span>
                     <h4 className="font-black text-emerald-800 text-lg m-0 mb-1">Cash Collection Mode</h4>
                     <p className="text-sm text-emerald-600 m-0 leading-relaxed">
-                      Please collect <strong className="text-emerald-900 font-black">₹{(paymentModal.order?.deliveryTotal || 0).toLocaleString('en-IN')}</strong> in cash from the customer for delivery charges.
+                      Please collect <strong className="text-emerald-900 font-black">₹{(paymentModal.order?.grandTotal || paymentModal.order?.totalAmount || 0)?.toLocaleString('en-IN')}</strong> in cash from the customer.
                     </p>
                   </div>
                   <button 

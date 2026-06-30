@@ -97,13 +97,13 @@ function Invoice() {
             <span style={{ color: '#4b5563' }}>Product Total</span>
             <span>₹{order.productTotal?.toLocaleString('en-IN')}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e5e7eb' }}>
-            <span style={{ color: '#4b5563' }}>Delivery Charge</span>
-            <span>₹{order.deliveryTotal?.toLocaleString('en-IN')}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #111827' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ color: '#4b5563' }}>Platform Fee</span>
-            <span>₹{order.platformFee?.toLocaleString('en-IN')}</span>
+            <span style={{ fontWeight: '600' }}>₹{order.platformFee || 0}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ color: '#4b5563' }}>Delivery Charges</span>
+            <span style={{ fontWeight: '600' }}>₹{order.deliveryCharge || order.deliveryTotal || 0}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', fontSize: '1.2rem', fontWeight: 'bold' }}>
             <span>Grand Total</span>

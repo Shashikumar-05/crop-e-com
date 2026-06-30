@@ -13,6 +13,10 @@ function ManagerSales() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
+  // UI state
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders', 'revenue', 'farmers', 'delivery', 'platform'
+  const [searchQuery, setSearchQuery] = useState('');
+
   const storedUser = localStorage.getItem('user');
   const user = storedUser ? JSON.parse(storedUser) : null;
 
@@ -65,21 +69,39 @@ function ManagerSales() {
       end.setHours(23, 59, 59, 999);
     }
 
-    setFromDate(start.toISOString().split('T')[0]);
-    setToDate(end.toISOString().split('T')[0]);
+    const formatDate = (date) => {
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    setFromDate(formatDate(start));
+    setToDate(formatDate(end));
   };
 
   const handleReportTypeChange = (e) => {
     const type = e.target.value;
     setReportType(type);
-    setDefaultDates(type);
+    if (type === 'All Orders') {
+      setFromDate('');
+      setToDate('');
+    } else if (type !== 'Custom') {
+      setDefaultDates(type);
+    }
   };
 
   const applyFilters = () => {
-    const start = new Date(fromDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(toDate);
-    end.setHours(23, 59, 59, 999);
+    if (!fromDate || !toDate) {
+      setFilteredOrders(orders);
+      return;
+    }
+    
+    const [startYear, startMonth, startDay] = fromDate.split('-').map(Number);
+    const start = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
+    
+    const [endYear, endMonth, endDay] = toDate.split('-').map(Number);
+    const end = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999);
 
     const filtered = orders.filter(order => {
       const orderDate = new Date(order.createdAt);
@@ -94,8 +116,35 @@ function ManagerSales() {
     }
   }, [orders]); // Auto apply initially
 
-  const handleShow = () => {
-    applyFilters();
+  const handleShow = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setLoading(true);
+    try {
+      const { data } = await axios.get('/api/manager/orders', {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      setOrders(data);
+      
+      // Apply filters on the newly fetched data
+      if (!fromDate || !toDate) {
+        setFilteredOrders(data);
+        return;
+      }
+      const [startYear, startMonth, startDay] = fromDate.split('-').map(Number);
+      const start = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
+      const [endYear, endMonth, endDay] = toDate.split('-').map(Number);
+      const end = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999);
+  
+      const filtered = data.filter(order => {
+        const orderDate = new Date(order.createdAt);
+        return orderDate >= start && orderDate <= end;
+      });
+      setFilteredOrders(filtered);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const exportToCSV = () => {
@@ -137,13 +186,40 @@ function ManagerSales() {
     document.body.removeChild(link);
   };
 
+  const handlePayFarmer = async (farmerId) => {
+    if (!window.confirm('Mark all pending completed orders for this farmer as paid?')) return;
+    try {
+      await axios.put(`/api/manager/pay-farmer/${farmerId}`, {}, {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      fetchSales(); // Refresh
+    } catch (err) {
+      console.error(err);
+      alert('Error marking as paid');
+    }
+  };
+
+  const handlePayDeliveryPartner = async (partnerId) => {
+    if (!window.confirm('Mark all pending completed orders for this delivery partner as paid?')) return;
+    try {
+      await axios.put(`/api/manager/pay-delivery/${partnerId}`, {}, {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      fetchSales(); // Refresh
+    } catch (err) {
+      console.error(err);
+      alert('Error marking as paid');
+    }
+  };
+
   // Summaries
   // We calculate summaries based on completed orders in the filtered list
   const completedOrders = filteredOrders.filter(o => o.orderStatus === 'Delivered');
   const totalOrders = filteredOrders.length;
-  const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-  const totalDeliveryCharges = completedOrders.reduce((sum, o) => sum + (o.deliveryTotal || 0), 0);
+  const totalDeliveryCharges = completedOrders.reduce((sum, o) => sum + (o.deliveryTotal || o.deliveryCharge || 0), 0);
   const totalPlatformFees = completedOrders.reduce((sum, o) => sum + (o.platformFee || 0), 0);
+  const totalFarmerAmount = completedOrders.reduce((sum, o) => sum + (o.productTotal || o.totalAmount || 0), 0);
+  const totalRevenue = totalFarmerAmount + totalDeliveryCharges + totalPlatformFees;
 
   // Group by delivery partner
   const deliveryPartnerStats = completedOrders.reduce((acc, order) => {
@@ -151,13 +227,43 @@ function ManagerSales() {
       const id = order.deliveryPartner._id;
       if (!acc[id]) {
         acc[id] = {
+          id: id,
           name: order.deliveryPartner.name,
           orders: 0,
-          deliveryEarnings: 0
+          deliveryEarnings: 0,
+          pendingAmount: 0
         };
       }
       acc[id].orders += 1;
-      acc[id].deliveryEarnings += (order.deliveryTotal || 0);
+      const amount = (order.deliveryTotal || order.deliveryCharge || 0);
+      acc[id].deliveryEarnings += amount;
+      if (!order.deliveryPartnerPaid) {
+        acc[id].pendingAmount += amount;
+      }
+    }
+    return acc;
+  }, {});
+
+  // Group by farmer
+  const farmerStats = completedOrders.reduce((acc, order) => {
+    if (order.items && order.items.length > 0 && order.items[0].farmer) {
+      const farmer = order.items[0].farmer;
+      const id = farmer._id;
+      if (!acc[id]) {
+        acc[id] = {
+          id: id,
+          name: farmer.name,
+          orders: 0,
+          productEarnings: 0,
+          pendingAmount: 0
+        };
+      }
+      acc[id].orders += 1;
+      const amount = (order.productTotal || order.totalAmount || 0);
+      acc[id].productEarnings += amount;
+      if (!order.farmerPaid) {
+        acc[id].pendingAmount += amount;
+      }
     }
     return acc;
   }, {});
@@ -184,6 +290,7 @@ function ManagerSales() {
               <option value="Daily">Daily Report</option>
               <option value="Weekly">Weekly Report</option>
               <option value="Monthly">Monthly Report</option>
+              <option value="All Orders">All Orders</option>
               <option value="Custom">Custom Date Range</option>
             </select>
           </div>
@@ -226,133 +333,270 @@ function ManagerSales() {
       </div>
 
       {/* SUMMARY CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-center">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <div 
+          onClick={() => setActiveTab('orders')}
+          className={`bg-white p-5 rounded-2xl shadow-sm border flex flex-col justify-center cursor-pointer transition ${activeTab === 'orders' ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-gray-200 hover:bg-gray-50'}`}
+        >
           <p className="text-sm font-semibold text-gray-500 mb-1">Total Orders</p>
           <p className="text-3xl font-bold text-gray-900">{totalOrders}</p>
           <p className="text-xs text-gray-400 mt-2">In selected period</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-center border-l-4 border-l-emerald-500">
+        <div 
+          onClick={() => setActiveTab('revenue')}
+          className={`bg-white p-5 rounded-2xl shadow-sm border-l-4 border-l-emerald-500 flex flex-col justify-center cursor-pointer transition ${activeTab === 'revenue' ? 'border-emerald-500 ring-2 ring-emerald-200 border-r border-t border-b' : 'border-gray-200 border-r border-t border-b hover:bg-gray-50'}`}
+        >
           <p className="text-sm font-semibold text-gray-500 mb-1">Total Revenue</p>
           <p className="text-3xl font-bold text-gray-900">₹{totalRevenue.toLocaleString('en-IN')}</p>
           <p className="text-xs text-emerald-600 font-medium mt-2">Completed orders only</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-center border-l-4 border-l-blue-500">
+        <div 
+          onClick={() => setActiveTab('farmers')}
+          className={`bg-white p-5 rounded-2xl shadow-sm border-l-4 border-l-amber-500 flex flex-col justify-center cursor-pointer transition ${activeTab === 'farmers' ? 'border-amber-500 ring-2 ring-amber-200 border-r border-t border-b' : 'border-gray-200 border-r border-t border-b hover:bg-gray-50'}`}
+        >
+          <p className="text-sm font-semibold text-gray-500 mb-1">Farmer Earnings</p>
+          <p className="text-3xl font-bold text-gray-900">₹{totalFarmerAmount.toLocaleString('en-IN')}</p>
+          <p className="text-xs text-amber-600 font-medium mt-2">Product sales</p>
+        </div>
+        <div 
+          onClick={() => setActiveTab('delivery')}
+          className={`bg-white p-5 rounded-2xl shadow-sm border-l-4 border-l-blue-500 flex flex-col justify-center cursor-pointer transition ${activeTab === 'delivery' ? 'border-blue-500 ring-2 ring-blue-200 border-r border-t border-b' : 'border-gray-200 border-r border-t border-b hover:bg-gray-50'}`}
+        >
           <p className="text-sm font-semibold text-gray-500 mb-1">Total Delivery Charges</p>
           <p className="text-3xl font-bold text-gray-900">₹{totalDeliveryCharges.toLocaleString('en-IN')}</p>
           <p className="text-xs text-blue-600 font-medium mt-2">Paid to riders</p>
         </div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-center border-l-4 border-l-purple-500">
+        <div 
+          onClick={() => setActiveTab('platform')}
+          className={`bg-white p-5 rounded-2xl shadow-sm border-l-4 border-l-purple-500 flex flex-col justify-center cursor-pointer transition ${activeTab === 'platform' ? 'border-purple-500 ring-2 ring-purple-200 border-r border-t border-b' : 'border-gray-200 border-r border-t border-b hover:bg-gray-50'}`}
+        >
           <p className="text-sm font-semibold text-gray-500 mb-1">Total Platform Fees</p>
           <p className="text-3xl font-bold text-gray-900">₹{totalPlatformFees.toLocaleString('en-IN')}</p>
           <p className="text-xs text-purple-600 font-medium mt-2">Platform earnings</p>
         </div>
       </div>
 
-      {/* TABLE SECTION */}
+      {/* CONTENT AREA */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-8">
-        <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-gray-800 m-0">Detailed Transactions</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left whitespace-nowrap">
-            <thead className="text-[11px] text-gray-500 uppercase bg-gray-50 border-b">
-              <tr>
-                <th className="px-6 py-4 font-bold">Order Date</th>
-                <th className="px-6 py-4 font-bold">Order ID</th>
-                <th className="px-6 py-4 font-bold">Location / Area</th>
-                <th className="px-6 py-4 font-bold">Customer Name</th>
-                <th className="px-6 py-4 font-bold">Seller Name</th>
-                <th className="px-6 py-4 font-bold">Delivery Partner</th>
-                <th className="px-6 py-4 font-bold">Vehicle Type</th>
-                <th className="px-6 py-4 font-bold text-right text-indigo-700 bg-indigo-50/50">Total Amt</th>
-                <th className="px-6 py-4 font-bold text-right">Product Amt</th>
-                <th className="px-6 py-4 font-bold text-right">Delivery Chg</th>
-                <th className="px-6 py-4 font-bold text-right">Platform Fee</th>
-                <th className="px-6 py-4 font-bold text-center">Payment</th>
-                <th className="px-6 py-4 font-bold text-right text-red-600 bg-red-50/50">Pending Amt</th>
-                <th className="px-6 py-4 font-bold text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredOrders.length === 0 ? (
-                <tr>
-                  <td colSpan="14" className="px-6 py-10 text-center text-gray-500">No transactions found for the selected period.</td>
-                </tr>
-              ) : (
-                filteredOrders.map(order => {
-                  const productAmt = order.productTotal || (order.totalAmount - (order.deliveryTotal || 0) - (order.platformFee || 0));
-                  const pendingAmt = order.paymentMethod === 'COD' && order.orderStatus !== 'Delivered' ? order.totalAmount : 0;
-                  
-                  return (
-                    <tr key={order._id} className="hover:bg-gray-50 transition">
-                      <td className="px-6 py-4 text-gray-600">{new Date(order.createdAt).toLocaleDateString('en-GB')}</td>
-                      <td className="px-6 py-4 font-semibold text-gray-800">{order.order_id || '#' + order._id.slice(-6).toUpperCase()}</td>
-                      <td className="px-6 py-4 text-gray-600 truncate max-w-[150px]" title={order.deliveryAddress || order.buyer?.location}>
-                        {order.deliveryAddress || order.buyer?.location || '-'}
-                      </td>
-                      <td className="px-6 py-4 font-medium text-gray-700">{order.buyer?.name || 'Guest'}</td>
-                      <td className="px-6 py-4 text-gray-600">{order.items?.[0]?.farmer?.name || 'Unknown'}</td>
-                      <td className="px-6 py-4 text-gray-600">{order.deliveryPartner?.name || '-'}</td>
-                      <td className="px-6 py-4 text-gray-600">{order.vehicle?.vehicle_type || '-'}</td>
-                      <td className="px-6 py-4 font-bold text-indigo-700 text-right bg-indigo-50/30">₹{order.totalAmount?.toLocaleString('en-IN') || 0}</td>
-                      <td className="px-6 py-4 text-gray-700 text-right">₹{productAmt?.toLocaleString('en-IN') || 0}</td>
-                      <td className="px-6 py-4 text-gray-700 text-right">₹{order.deliveryTotal?.toLocaleString('en-IN') || 0}</td>
-                      <td className="px-6 py-4 text-gray-700 text-right">₹{order.platformFee?.toLocaleString('en-IN') || 0}</td>
+        
+        {/* TOTAL ORDERS TAB */}
+        {activeTab === 'orders' && (
+          <>
+            <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-gray-800 m-0">Detailed Transactions</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left whitespace-nowrap">
+                <thead className="text-[11px] text-gray-500 uppercase bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-6 py-4 font-bold">Order Date</th>
+                    <th className="px-6 py-4 font-bold">Order ID</th>
+                    <th className="px-6 py-4 font-bold">Customer</th>
+                    <th className="px-6 py-4 font-bold">Seller</th>
+                    <th className="px-6 py-4 font-bold">Delivery Partner</th>
+                    <th className="px-6 py-4 font-bold text-right text-indigo-700 bg-indigo-50/50">Total Amt</th>
+                    <th className="px-6 py-4 font-bold text-right">Product Amt</th>
+                    <th className="px-6 py-4 font-bold text-right">Delivery Chg</th>
+                    <th className="px-6 py-4 font-bold text-right">Platform Fee</th>
+                    <th className="px-6 py-4 font-bold text-center">Payment</th>
+                    <th className="px-6 py-4 font-bold text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan="11" className="px-6 py-10 text-center text-gray-500">No transactions found for the selected period.</td>
+                    </tr>
+                  ) : (
+                    filteredOrders.map(order => {
+                      const productAmt = order.productTotal || (order.totalAmount - (order.deliveryTotal || 0) - (order.platformFee || 0));
+                      
+                      return (
+                        <tr key={order._id} className="hover:bg-gray-50 transition">
+                          <td className="px-6 py-4 text-gray-600">{new Date(order.createdAt).toLocaleDateString('en-GB')}</td>
+                          <td className="px-6 py-4 font-semibold text-gray-800">{order.order_id || '#' + order._id.slice(-6).toUpperCase()}</td>
+                          <td className="px-6 py-4 font-medium text-gray-700">{order.buyer?.name || 'Guest'}</td>
+                          <td className="px-6 py-4 text-gray-600">{order.items?.[0]?.farmer?.name || 'Unknown'}</td>
+                          <td className="px-6 py-4 text-gray-600">{order.deliveryPartner?.name || '-'}</td>
+                          <td className="px-6 py-4 font-bold text-indigo-700 text-right bg-indigo-50/30">₹{(order.grandTotal || order.totalAmount)?.toLocaleString('en-IN') || 0}</td>
+                          <td className="px-6 py-4 text-gray-700 text-right">₹{productAmt?.toLocaleString('en-IN') || 0}</td>
+                          <td className="px-6 py-4 text-gray-700 text-right">₹{(order.deliveryTotal || order.deliveryCharge)?.toLocaleString('en-IN') || 0}</td>
+                          <td className="px-6 py-4 text-gray-700 text-right">₹{order.platformFee?.toLocaleString('en-IN') || 0}</td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${order.paymentMethod === 'Online' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                              {order.paymentMethod || 'COD'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider
+                              ${order.orderStatus === 'Delivered' ? 'bg-green-100 text-green-700' : 
+                                order.orderStatus === 'Cancelled' ? 'bg-red-100 text-red-700' : 
+                                ['Pending', 'Waiting for Manager Review'].includes(order.orderStatus) ? 'bg-yellow-100 text-yellow-700' : 
+                                'bg-blue-100 text-blue-700'}`}
+                            >
+                              {order.orderStatus === 'Assigned to Delivery Partner' ? 'Assigned' : order.orderStatus}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {/* REVENUE TAB */}
+        {activeTab === 'revenue' && (
+          <div className="p-10 text-center">
+            <h3 className="text-xl font-bold text-emerald-600 mb-2">Revenue Breakdown</h3>
+            <p className="text-gray-500 mb-6">Where our platform generated income in this period</p>
+            <div className="flex justify-center gap-8">
+              <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-2xl min-w-[200px]">
+                <p className="text-sm font-semibold text-emerald-800 mb-2">Platform Fees Collected</p>
+                <p className="text-4xl font-bold text-emerald-600">₹{totalPlatformFees.toLocaleString('en-IN')}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* FARMER EARNINGS TAB */}
+        {activeTab === 'farmers' && (
+          <>
+            <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
+              <h2 className="text-lg font-bold text-gray-800 m-0">Farmer Ledgers & Payouts</h2>
+              <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+                <div className="bg-red-50 px-4 py-2 rounded-lg border border-red-100 flex items-center gap-2">
+                  <span className="text-sm text-red-600 font-medium">Total Pending Balance:</span>
+                  <span className="text-lg font-bold text-red-700">
+                    ₹{Object.values(farmerStats).reduce((sum, f) => sum + f.pendingAmount, 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="Search farmers..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-4 py-2 w-full md:w-64 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                />
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left whitespace-nowrap">
+                <thead className="text-[11px] text-gray-500 uppercase bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-6 py-4 font-bold">Farmer Name</th>
+                    <th className="px-6 py-4 font-bold text-center">Completed Orders</th>
+                    <th className="px-6 py-4 font-bold text-right text-amber-700 bg-amber-50/50">Total Earnings</th>
+                    <th className="px-6 py-4 font-bold text-right text-red-600 bg-red-50/50">Pending Balance</th>
+                    <th className="px-6 py-4 font-bold text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {Object.values(farmerStats)
+                    .filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .map((stat, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50 transition">
+                      <td className="px-6 py-4 font-bold text-gray-800">{stat.name}</td>
+                      <td className="px-6 py-4 text-center font-medium text-gray-600">{stat.orders}</td>
+                      <td className="px-6 py-4 font-bold text-amber-700 text-right bg-amber-50/30">₹{stat.productEarnings.toLocaleString('en-IN')}</td>
+                      <td className="px-6 py-4 font-bold text-red-600 text-right bg-red-50/30">₹{stat.pendingAmount.toLocaleString('en-IN')}</td>
                       <td className="px-6 py-4 text-center">
-                        <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${order.paymentMethod === 'Online' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
-                          {order.paymentMethod || 'COD'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 font-semibold text-red-600 text-right bg-red-50/30">
-                        {pendingAmt > 0 ? `₹${pendingAmt.toLocaleString('en-IN')}` : '-'}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider
-                          ${order.orderStatus === 'Delivered' ? 'bg-green-100 text-green-700' : 
-                            order.orderStatus === 'Cancelled' ? 'bg-red-100 text-red-700' : 
-                            ['Pending', 'Waiting for Manager Review'].includes(order.orderStatus) ? 'bg-yellow-100 text-yellow-700' : 
-                            'bg-blue-100 text-blue-700'}`}
+                        <button 
+                          onClick={() => handlePayFarmer(stat.id)}
+                          disabled={stat.pendingAmount === 0}
+                          className={`px-4 py-2 rounded-lg font-bold text-xs transition ${stat.pendingAmount > 0 ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                         >
-                          {order.orderStatus === 'Assigned to Delivery Partner' ? 'Assigned' : order.orderStatus}
-                        </span>
+                          {stat.pendingAmount > 0 ? 'Mark as Paid' : 'Settled'}
+                        </button>
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                  ))}
+                  {Object.values(farmerStats).length === 0 && (
+                    <tr><td colSpan="5" className="px-6 py-10 text-center text-gray-500">No farmer data available.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
 
-      {/* DELIVERY PARTNER BASED VIEW */}
-      {Object.keys(deliveryPartnerStats).length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-5 border-b border-gray-100 bg-gray-50/50">
-            <h2 className="text-lg font-bold text-gray-800 m-0">Delivery Partner Earnings (Completed)</h2>
-          </div>
-          <div className="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.values(deliveryPartnerStats).map((stat, idx) => (
-              <div key={idx} className="border border-gray-200 rounded-xl p-4 flex items-center justify-between hover:shadow-md transition">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
-                    {stat.name.charAt(0)}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-800">{stat.name}</h3>
-                    <p className="text-xs text-gray-500">{stat.orders} orders handled</p>
-                  </div>
+        {/* DELIVERY TAB */}
+        {activeTab === 'delivery' && (
+          <>
+            <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row justify-between items-center gap-4">
+              <h2 className="text-lg font-bold text-gray-800 m-0">Delivery Partner Ledgers & Payouts</h2>
+              <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+                <div className="bg-red-50 px-4 py-2 rounded-lg border border-red-100 flex items-center gap-2">
+                  <span className="text-sm text-red-600 font-medium">Total Pending Balance:</span>
+                  <span className="text-lg font-bold text-red-700">
+                    ₹{Object.values(deliveryPartnerStats).reduce((sum, d) => sum + d.pendingAmount, 0).toLocaleString('en-IN')}
+                  </span>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500 mb-0.5">Earnings</p>
-                  <p className="font-bold text-lg text-emerald-600">₹{stat.deliveryEarnings.toLocaleString('en-IN')}</p>
-                </div>
+                <input 
+                  type="text" 
+                  placeholder="Search delivery partners..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-4 py-2 w-full md:w-64 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                />
               </div>
-            ))}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left whitespace-nowrap">
+                <thead className="text-[11px] text-gray-500 uppercase bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-6 py-4 font-bold">Partner Name</th>
+                    <th className="px-6 py-4 font-bold text-center">Completed Deliveries</th>
+                    <th className="px-6 py-4 font-bold text-right text-blue-700 bg-blue-50/50">Total Earnings</th>
+                    <th className="px-6 py-4 font-bold text-right text-red-600 bg-red-50/50">Pending Balance</th>
+                    <th className="px-6 py-4 font-bold text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {Object.values(deliveryPartnerStats)
+                    .filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .map((stat, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50 transition">
+                      <td className="px-6 py-4 font-bold text-gray-800">{stat.name}</td>
+                      <td className="px-6 py-4 text-center font-medium text-gray-600">{stat.orders}</td>
+                      <td className="px-6 py-4 font-bold text-blue-700 text-right bg-blue-50/30">₹{stat.deliveryEarnings.toLocaleString('en-IN')}</td>
+                      <td className="px-6 py-4 font-bold text-red-600 text-right bg-red-50/30">₹{stat.pendingAmount.toLocaleString('en-IN')}</td>
+                      <td className="px-6 py-4 text-center">
+                        <button 
+                          onClick={() => handlePayDeliveryPartner(stat.id)}
+                          disabled={stat.pendingAmount === 0}
+                          className={`px-4 py-2 rounded-lg font-bold text-xs transition ${stat.pendingAmount > 0 ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                        >
+                          {stat.pendingAmount > 0 ? 'Mark as Paid' : 'Settled'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {Object.values(deliveryPartnerStats).length === 0 && (
+                    <tr><td colSpan="5" className="px-6 py-10 text-center text-gray-500">No delivery partner data available.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {/* PLATFORM TAB */}
+        {activeTab === 'platform' && (
+          <div className="p-10 text-center">
+            <h3 className="text-xl font-bold text-purple-600 mb-2">Platform Fees</h3>
+            <p className="text-gray-500 mb-6">Total earnings from platform service fees</p>
+            <div className="flex justify-center gap-8">
+              <div className="bg-purple-50 border border-purple-100 p-6 rounded-2xl min-w-[200px]">
+                <p className="text-4xl font-bold text-purple-600">₹{totalPlatformFees.toLocaleString('en-IN')}</p>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+      </div>
 
     </div>
   );
