@@ -5,7 +5,8 @@
   "scripts": {
     "server": "npx nodemon backend/server.js",
     "client": "npm run dev --prefix frontend",
-    "dev": "concurrently \"npm run server\" \"npm run client\""
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "div": "npm run dev"
   },
   "dependencies": {
     "concurrently": "^8.2.2"

@@ -186,29 +186,55 @@ function ManagerSales() {
     document.body.removeChild(link);
   };
 
-  const handlePayFarmer = async (farmerId) => {
-    if (!window.confirm('Mark all pending completed orders for this farmer as paid?')) return;
+  const handlePayFarmer = async (farmerId, pendingAmount) => {
+    const amountStr = window.prompt(`How much to pay this farmer now?\nTotal pending: ₹${pendingAmount.toLocaleString('en-IN')}`, pendingAmount);
+    if (amountStr === null) return;
+    const amount = Number(amountStr);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+    if (amount > pendingAmount) {
+      alert(`Cannot pay more than the pending balance (₹${pendingAmount.toLocaleString('en-IN')}).`);
+      return;
+    }
+    
+    setLoading(true);
     try {
-      await axios.put(`/api/manager/pay-farmer/${farmerId}`, {}, {
+      await axios.put(`/api/manager/pay-farmer/${farmerId}`, { amount }, {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       fetchSales(); // Refresh
     } catch (err) {
       console.error(err);
       alert('Error marking as paid');
+      setLoading(false);
     }
   };
 
-  const handlePayDeliveryPartner = async (partnerId) => {
-    if (!window.confirm('Mark all pending completed orders for this delivery partner as paid?')) return;
+  const handlePayDeliveryPartner = async (partnerId, pendingAmount) => {
+    const amountStr = window.prompt(`How much to pay this delivery partner now?\nTotal pending: ₹${pendingAmount.toLocaleString('en-IN')}`, pendingAmount);
+    if (amountStr === null) return;
+    const amount = Number(amountStr);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+    if (amount > pendingAmount) {
+      alert(`Cannot pay more than the pending balance (₹${pendingAmount.toLocaleString('en-IN')}).`);
+      return;
+    }
+
+    setLoading(true);
     try {
-      await axios.put(`/api/manager/pay-delivery/${partnerId}`, {}, {
+      await axios.put(`/api/manager/pay-delivery/${partnerId}`, { amount }, {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       fetchSales(); // Refresh
     } catch (err) {
       console.error(err);
       alert('Error marking as paid');
+      setLoading(false);
     }
   };
 
@@ -237,9 +263,8 @@ function ManagerSales() {
       acc[id].orders += 1;
       const amount = (order.deliveryTotal || order.deliveryCharge || 0);
       acc[id].deliveryEarnings += amount;
-      if (!order.deliveryPartnerPaid) {
-        acc[id].pendingAmount += amount;
-      }
+      const paid = order.deliveryPartnerPaidAmount || (order.deliveryPartnerPaid ? amount : 0);
+      acc[id].pendingAmount += Math.max(0, amount - paid);
     }
     return acc;
   }, {});
@@ -261,9 +286,8 @@ function ManagerSales() {
       acc[id].orders += 1;
       const amount = (order.productTotal || order.totalAmount || 0);
       acc[id].productEarnings += amount;
-      if (!order.farmerPaid) {
-        acc[id].pendingAmount += amount;
-      }
+      const paid = order.farmerPaidAmount || (order.farmerPaid ? amount : 0);
+      acc[id].pendingAmount += Math.max(0, amount - paid);
     }
     return acc;
   }, {});
@@ -504,7 +528,7 @@ function ManagerSales() {
                       <td className="px-6 py-4 font-bold text-red-600 text-right bg-red-50/30">₹{stat.pendingAmount.toLocaleString('en-IN')}</td>
                       <td className="px-6 py-4 text-center">
                         <button 
-                          onClick={() => handlePayFarmer(stat.id)}
+                          onClick={() => handlePayFarmer(stat.id, stat.pendingAmount)}
                           disabled={stat.pendingAmount === 0}
                           className={`px-4 py-2 rounded-lg font-bold text-xs transition ${stat.pendingAmount > 0 ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                         >
@@ -565,7 +589,7 @@ function ManagerSales() {
                       <td className="px-6 py-4 font-bold text-red-600 text-right bg-red-50/30">₹{stat.pendingAmount.toLocaleString('en-IN')}</td>
                       <td className="px-6 py-4 text-center">
                         <button 
-                          onClick={() => handlePayDeliveryPartner(stat.id)}
+                          onClick={() => handlePayDeliveryPartner(stat.id, stat.pendingAmount)}
                           disabled={stat.pendingAmount === 0}
                           className={`px-4 py-2 rounded-lg font-bold text-xs transition ${stat.pendingAmount > 0 ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                         >

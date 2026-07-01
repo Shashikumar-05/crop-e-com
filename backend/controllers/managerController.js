@@ -525,14 +525,60 @@ const payFarmer = async (req, res) => {
   try {
     if (req.user.role !== 'Manager') return res.status(403).json({ message: 'Not authorized' });
     const { farmerId } = req.params;
+    let { amount } = req.body;
     
-    // Find all delivered orders for this farmer where farmerPaid is false
-    const result = await Order.updateMany(
-      { 'items.farmer': farmerId, orderStatus: 'Delivered', farmerPaid: { $ne: true } },
-      { $set: { farmerPaid: true } }
-    );
+    if (amount === undefined) {
+      // Legacy behavior: Mark all pending as paid
+      const result = await Order.updateMany(
+        { 'items.farmer': farmerId, orderStatus: 'Delivered', farmerPaid: { $ne: true } },
+        { $set: { farmerPaid: true } }
+      );
+      return res.json({ message: 'Farmer marked as paid for all pending completed orders.', updatedCount: result.modifiedCount });
+    }
+
+    amount = Number(amount);
+    if (isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ message: 'Invalid payment amount' });
+    }
+
+    // Fetch unpaid/partially paid orders, sorted by oldest first
+    const orders = await Order.find({ 
+      'items.farmer': farmerId, 
+      orderStatus: 'Delivered', 
+      farmerPaid: { $ne: true } 
+    }).sort({ createdAt: 1 });
+
+    let updatedCount = 0;
     
-    res.json({ message: 'Farmer marked as paid for all pending completed orders.', updatedCount: result.modifiedCount });
+    for (const order of orders) {
+      if (amount <= 0) break;
+      
+      const productTotal = order.productTotal || order.totalAmount || 0;
+      const alreadyPaid = order.farmerPaidAmount || 0;
+      const pendingForOrder = productTotal - alreadyPaid;
+      
+      if (pendingForOrder <= 0) {
+        order.farmerPaid = true;
+        await order.save();
+        continue;
+      }
+
+      if (amount >= pendingForOrder) {
+        // Pay this order completely
+        order.farmerPaidAmount = productTotal;
+        order.farmerPaid = true;
+        amount -= pendingForOrder;
+      } else {
+        // Pay partially
+        order.farmerPaidAmount = alreadyPaid + amount;
+        amount = 0;
+      }
+      
+      await order.save();
+      updatedCount++;
+    }
+
+    res.json({ message: `Payment applied successfully.`, updatedCount });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -542,14 +588,57 @@ const payDeliveryPartner = async (req, res) => {
   try {
     if (req.user.role !== 'Manager') return res.status(403).json({ message: 'Not authorized' });
     const { partnerId } = req.params;
+    let { amount } = req.body;
     
-    // Find all delivered orders for this delivery partner where deliveryPartnerPaid is false
-    const result = await Order.updateMany(
-      { deliveryPartner: partnerId, orderStatus: 'Delivered', deliveryPartnerPaid: { $ne: true } },
-      { $set: { deliveryPartnerPaid: true } }
-    );
+    if (amount === undefined) {
+      // Legacy behavior
+      const result = await Order.updateMany(
+        { deliveryPartner: partnerId, orderStatus: 'Delivered', deliveryPartnerPaid: { $ne: true } },
+        { $set: { deliveryPartnerPaid: true } }
+      );
+      return res.json({ message: 'Delivery Partner marked as paid for all pending completed orders.', updatedCount: result.modifiedCount });
+    }
+
+    amount = Number(amount);
+    if (isNaN(amount) || amount <= 0) {
+      return res.status(400).json({ message: 'Invalid payment amount' });
+    }
+
+    const orders = await Order.find({ 
+      deliveryPartner: partnerId, 
+      orderStatus: 'Delivered', 
+      deliveryPartnerPaid: { $ne: true } 
+    }).sort({ createdAt: 1 });
+
+    let updatedCount = 0;
     
-    res.json({ message: 'Delivery Partner marked as paid for all pending completed orders.', updatedCount: result.modifiedCount });
+    for (const order of orders) {
+      if (amount <= 0) break;
+      
+      const deliveryTotal = order.deliveryTotal || order.deliveryCharge || 0;
+      const alreadyPaid = order.deliveryPartnerPaidAmount || 0;
+      const pendingForOrder = deliveryTotal - alreadyPaid;
+      
+      if (pendingForOrder <= 0) {
+        order.deliveryPartnerPaid = true;
+        await order.save();
+        continue;
+      }
+
+      if (amount >= pendingForOrder) {
+        order.deliveryPartnerPaidAmount = deliveryTotal;
+        order.deliveryPartnerPaid = true;
+        amount -= pendingForOrder;
+      } else {
+        order.deliveryPartnerPaidAmount = alreadyPaid + amount;
+        amount = 0;
+      }
+      
+      await order.save();
+      updatedCount++;
+    }
+
+    res.json({ message: `Payment applied successfully.`, updatedCount });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

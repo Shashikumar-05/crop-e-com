@@ -25,14 +25,6 @@ export default function MapConfirmScreen({ initialLat, initialLng, onConfirm }) 
   
   const geocoder = useRef(null);
 
-  // Initialize geocoder once the Google API is fully loaded
-  useEffect(() => {
-    if (isLoaded && !geocoder.current && window.google) {
-      geocoder.current = new window.google.maps.Geocoder();
-      fetchAddress(center.lat, center.lng);
-    }
-  }, [isLoaded, center.lat, center.lng]);
-
   // Reverse Geocoding: Converts lat/lng into a readable street address
   const fetchAddress = (lat, lng) => {
     if (!geocoder.current) return;
@@ -46,6 +38,14 @@ export default function MapConfirmScreen({ initialLat, initialLng, onConfirm }) 
       }
     });
   };
+
+  // Initialize geocoder once the Google API is fully loaded
+  useEffect(() => {
+    if (isLoaded && !geocoder.current && window.google) {
+      geocoder.current = new window.google.maps.Geocoder();
+      fetchAddress(center.lat, center.lng);
+    }
+  }, [isLoaded, center.lat, center.lng]);
 
   const onLoad = useCallback(function callback(mapInstance) {
     setMap(mapInstance);

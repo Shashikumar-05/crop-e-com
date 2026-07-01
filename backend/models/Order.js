@@ -60,6 +60,8 @@ const orderSchema = new mongoose.Schema({
   grandTotal: { type: Number, default: 0 },
   sellerAmount: { type: Number, default: 0 },
   deliveryPartnerAmount: { type: Number, default: 0 },
+  farmerPaidAmount: { type: Number, default: 0 },
+  deliveryPartnerPaidAmount: { type: Number, default: 0 },
   farmerPaid: { type: Boolean, default: false },
   deliveryPartnerPaid: { type: Boolean, default: false },
   completedAt: { type: Date },
